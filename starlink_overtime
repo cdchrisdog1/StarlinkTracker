@@ -1,0 +1,59 @@
+from skyfield.api import load, EarthSatellite
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from datetime import datetime, timedelta
+
+def read_tle_file(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    satellites = {}
+    for i in range(0, len(lines), 3):
+        name = lines[i].strip()
+        line1 = lines[i+1].strip()
+        line2 = lines[i+2].strip()
+        satellites[name] = EarthSatellite(line1, line2)
+
+    return satellites
+
+def get_orbit_path(satellite, hours=24, step_minutes=1):
+    ts = load.timescale()
+    t0 = ts.now()
+    t1 = ts.now() + timedelta(hours=hours)
+
+    times = [ts.utc(t0.utc_datetime() + timedelta(minutes=i)) for i in range(0, hours * 60, step_minutes)]
+
+    latitudes = []
+    longitudes = []
+    for t in times:
+        geocentric = satellite.at(t)
+        subpoint = geocentric.subpoint()
+        latitudes.append(subpoint.latitude.degrees)
+        longitudes.append(subpoint.longitude.degrees)
+    
+    return latitudes, longitudes
+
+# Path to your TLE file
+file_path = 'starlink1.txt'
+
+# Read TLEs from the file
+satellites = read_tle_file(file_path)
+
+# Create a map using Cartopy
+fig = plt.figure(figsize=(10, 5))
+ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+
+# Draw coastlines, country boundaries, fill continents.
+ax.add_feature(cfeature.LAND)
+ax.add_feature(cfeature.OCEAN)
+ax.add_feature(cfeature.COASTLINE)
+
+# Plot satellite orbit paths
+for name, satellite in satellites.items():
+    latitudes, longitudes = get_orbit_path(satellite)
+    ax.plot(longitudes, latitudes, label=name, transform=ccrs.Geodetic())
+
+plt.title("Satellite Orbit Paths")
+plt.legend(loc='upper left')
+plt.show()
